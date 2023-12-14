@@ -1,15 +1,17 @@
 # --------------------------------------------
 import enum
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import codefast as cf
 import pandas as pd
 from codefast.utils import retry
-# from rich import print
 
 from .db import rdcli
-from .gpt import chatgpt
-from .prompts import cot_prompt, io_prompt
+from .gpt import gpt
+from .prompts import (cot_prompt, io_prompt, propose_prompt,
+                      value_last_step_prompt, value_prompt)
 
+# from rich import print
 
 INFINITY = float('inf')
 
@@ -39,11 +41,12 @@ def get_puzzles() -> list:
 
 
 @retry(3)
-def solve(puzzles: list,
-          prompt_template: str,
-          redis_prefix: str = 'ioprompt',
-          prompt_type: PromptType = PromptType.IO,
-          ) -> tuple:
+def solve(
+    puzzles: list,
+    prompt_template: str,
+    redis_prefix: str = 'ioprompt',
+    prompt_type: PromptType = PromptType.IO,
+) -> tuple:
     """ Solve with prompting,
     :param puzzles: list of puzzles
     :param prompt_template: prompt template
@@ -63,9 +66,8 @@ def solve(puzzles: list,
                 'index': i
             }
         else:
-            gpt = chatgpt()
             prompt_str = prompt_template.format(puzzle)
-            response = gpt.get_response(prompt_str)
+            response = gpt(prompt_str)
             rdcli.set(key, response, ex=86400)
             msg = {
                 'input': puzzle,
@@ -104,6 +106,84 @@ def cot_solve(puzzles: list):
                  prompt_type=PromptType.COT)
 
 
+class PuzzleSolver(object):
+    pass
+
+
+def get_lefts(s: str) -> str:
+    # 4 * 5 = 20 (left: 20 6 10) -> 20 6 10
+    lefts = s.split('left: ')[-1].split(')')[0]
+    return lefts
+
+
+class ToTSolver(PuzzleSolver):
+    def __init__(self, puzzle: str, steps: int, sample_size: int = 1):
+        super().__init__()
+        self.steps = steps
+        self.sample_size = sample_size
+        self.states = [puzzle]
+        self.score_map = {'sure': 10, 'likely': 5, 'impossible': 1}
+
+    def step_forward(self):
+        new_states = []
+        for s in self.states:
+            s_new = get_lefts(s)
+            if s_new == '24':  # The last step
+                xs = s.split('\n')
+                input_s = cot_prompt.format(xs[0]).rstrip()
+                prompt_str = '\n'.join([input_s, 'Steps:'] + xs[1:])
+                response = gpt(prompt_str)
+                new_states.append(s + '\n' + response)
+            else:
+                prompt_str = propose_prompt.format(s_new)
+                response = gpt(prompt_str)
+                for r in response.split('\n'):
+                    new_states.append(s + '\n' + r)
+        return new_states
+
+    def score(self, states: List[str], step: int) -> List[float]:
+        for s in states:
+            if 'answer' in s.lower():
+                input_s = s.split('\n')[0]
+                answer_s = s.split('\n')[-1].lower().replace('answer: ', '')
+                prompt_str = value_last_step_prompt.format(input_s, answer_s)
+                response = gpt(prompt_str)
+                cf.info({'numbers': input_s, 'response': response})
+                value_str = response.split('\n')[-1].lower()
+                score = self.score_map.get(value_str, 0)
+                yield score
+            else:
+                s_ = get_lefts(s)
+                len_s = len(s_.split(' '))
+                if len_s + step + 1 != 4:
+                    yield 0  # Get rid of hallucination steps
+                else:
+                    prompt_str = value_prompt.format(s_)
+                    response = gpt(prompt_str)
+                    cf.info({'numbers': s_, 'response': response})
+                    value_str = response.split('\n')[-1].lower()
+                    score = self.score_map.get(value_str, 0)
+                    yield score
+
+    def solve(self):
+        for step in range(self.steps):
+            cf.info(f'At step {step}')
+            new_states = self.step_forward()
+            scores = list(self.score(new_states, step))
+            pairs = list(zip(new_states, scores))
+            pairs.sort(key=lambda x: x[1], reverse=True)
+            self.states = [_[0] for _ in pairs[:self.sample_size]]
+            print(self.states)
+            print(pairs)
+
+
+def tot_solve(puzzles: list):
+    pass
+
+
 if __name__ == '__main__':
     puzzles = get_puzzles()
-    cot_solve(puzzles)
+    # cot_solve(puzzles)
+    puzzle = '4 5 6 10\n10 - 4 = 6 (left: 5 6 6)\n5 * 6 = 30 (left: 30 6)\n30 - 6 = 24 (left: 24)'
+    totsolver = ToTSolver(puzzle, 1)
+    totsolver.solve()

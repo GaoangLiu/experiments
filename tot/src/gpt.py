@@ -21,4 +21,10 @@ def chatgpt():
               openai_key=None,
               bearer_token=api_key,
               proxy=None)
+
+def gpt(prompt_str)->str:
+    import google.generativeai as genai
+    genai.configure(api_key=os.getenv('GOOGLE_API_KEY'))
+    model = genai.GenerativeModel('gemini-pro')
+    return model.generate_content(prompt_str).text
     
