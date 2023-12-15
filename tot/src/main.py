@@ -1,5 +1,6 @@
 # --------------------------------------------
 import enum
+import re
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import codefast as cf
@@ -32,10 +33,10 @@ def evaluate(response: str, prompt_type: PromptType = PromptType.IO) -> float:
         return INFINITY
 
 
-def get_puzzles() -> list:
+def get_puzzles(start_index: int, end_index: int) -> list:
     csv_path = 'https://raw.githubusercontent.com/princeton-nlp/tree-of-thought-llm/master/src/tot/data/24/24.csv'
     df = pd.read_csv(csv_path)
-    df = df[(df['Rank'] >= 901) & (df['Rank'] <= 1000)]
+    df = df[(df['Rank'] >= start_index) & (df['Rank'] <= end_index)]
     puzzles = df['Puzzles'].tolist()
     return puzzles
 
@@ -176,14 +177,41 @@ class ToTSolver(PuzzleSolver):
             print(self.states)
             print(pairs)
 
+        final_state = self.states[0]
+        if 'answer' not in final_state.lower():
+            return 0
+        else:
+            answer_s = final_state.split('\n')[-1].lower().replace(
+                'answer: ', '')
+            formula = answer_s.split('=')[0].strip()
+            input_str = final_state.split('\n')[0]
+            input_numbers = sorted(re.findall(r'\d+', input_str))
+            output_numbers = sorted(re.findall(r'\d+', formula))
+            cf.info({
+                'input': input_numbers,
+                'output': output_numbers,
+                'formula': formula
+            })
+            if input_numbers != output_numbers:
+                return 0
+            else:
+                try:
+                    return 1 if eval(formula) == 24 else 0
+                except Exception as e:
+                    cf.warning(e)
+                    return 0
+
 
 def tot_solve(puzzles: list):
-    pass
+    results = []
+    for puzzle in puzzles:
+        totsolver = ToTSolver(puzzle, 4)
+        result = totsolver.solve()
+        results.append(result)
+    cf.info('Accuracy: {}'.format(sum(results) / len(results)))
+    return results
 
 
 if __name__ == '__main__':
-    puzzles = get_puzzles()
-    # cot_solve(puzzles)
-    puzzle = '4 5 6 10\n10 - 4 = 6 (left: 5 6 6)\n5 * 6 = 30 (left: 30 6)\n30 - 6 = 24 (left: 24)'
-    totsolver = ToTSolver(puzzle, 1)
-    totsolver.solve()
+    puzzles = get_puzzles(901, 1000)
+    tot_solve(puzzles)
