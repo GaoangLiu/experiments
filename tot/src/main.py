@@ -34,7 +34,7 @@ def evaluate(response: str, prompt_type: PromptType = PromptType.IO) -> float:
 
 
 def get_puzzles(start_index: int, end_index: int) -> list:
-    csv_path = 'https://raw.githubusercontent.com/princeton-nlp/tree-of-thought-llm/master/src/tot/data/24/24.csv'
+    csv_path = 'data/24.csv'
     df = pd.read_csv(csv_path)
     df = df[(df['Rank'] >= start_index) & (df['Rank'] <= end_index)]
     puzzles = df['Puzzles'].tolist()
@@ -205,10 +205,10 @@ class ToTSolver(PuzzleSolver):
 def tot_solve(puzzles: list):
     results = []
     for puzzle in puzzles:
-        totsolver = ToTSolver(puzzle, 4)
+        totsolver = ToTSolver(puzzle, 4,sample_size=5)
         result = totsolver.solve()
         results.append(result)
-    cf.info('Accuracy: {}'.format(sum(results) / len(results)))
+        cf.info('Accuracy: {}'.format(sum(results) / len(results)))
     return results
 
 
