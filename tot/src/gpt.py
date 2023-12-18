@@ -23,8 +23,6 @@ def chatgpt():
               proxy=None)
 
 def gpt(prompt_str)->str:
-    import google.generativeai as genai
-    genai.configure(api_key=os.getenv('GOOGLE_API_KEY'))
-    model = genai.GenerativeModel('gemini-pro')
-    return model.generate_content(prompt_str).text
+    response= cf.net.post('http://192.243.126.170:18080', json={'prompt': prompt_str})
+    return response.json()['response']
     

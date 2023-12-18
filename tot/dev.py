@@ -1,10 +1,10 @@
 from src.main import get_puzzles, ToTSolver
+from src.gpt import gpt
+import os 
 
 if __name__ == '__main__':
-    puzzles = get_puzzles()
-    # cot_solve(puzzles)
-    puzzle = '4 5 6 10\n10 - 4 = 6 (left: 5 6 6)\n5 * 6 = 30 (left: 30 6)\n30 - 6 = 24 (left: 24)'
-    puzzle = '3, 5, 10, 6\n5 + 6 = 11 (left: 3 10 11)\n3 + 10 = 13 (left: 13 11)\n11 + 13 = 24 (left: 24)'
-    
-    totsolver = ToTSolver(puzzle, 1)
-    totsolver.solve()
+    print(
+        gpt('Translate the following content into Chinese \
+            `is it possible to reach 24 with 8 2 6, if each number can be used only once? Please answer carefully, it is important to me. \
+                As the TV landscape continues to fracture, one new show emerged as a bona fide phenomenon: “The Last of Us,” HBO’s stunningly heartfelt zombie apocalypse thriller. Given that its source material was a beloved, acclaimed 2013 video game that has sold over 20 million copies, the bar was extraordinarily high. The show’s debut season delivered, in large part because of the synergy between the duo at its center: Pedro Pascal as Joel and Bella Ramsey as Ellie, two characters who find themselves on a cross-country quest, dodging reanimated corpses to (hopefully) save the world.')
+    )
